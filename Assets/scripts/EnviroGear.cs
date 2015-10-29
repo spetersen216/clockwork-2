@@ -6,11 +6,13 @@ public class EnviroGear : MonoBehaviour {
 	public float maxAngularVelocity=90f;
 	public float mass=1f;
 	public float angularAcceleration=10f;
+	public bool isMovable=false;
 
 	private List<EnviroGear> neighbors=new List<EnviroGear>();
 	private Transform gearTrans;
 	float radius;
 	private Rigidbody rigidBody;
+	private static List<Collider> staticColliders=new List<Collider>();
 	
 	private float curAngularVelocity;
 	private float momentOfIntertia { get { return 0.5f*mass*transform.localScale.y*transform.localScale.z; } }
@@ -24,6 +26,31 @@ public class EnviroGear : MonoBehaviour {
 		// initialize vars
 		radius = gameObject.GetComponent<Collider>().bounds.extents.x;
 		rigidBody = GetComponent<Rigidbody>();
+		
+		// handle static gears
+		if (!isMovable) {
+			gameObject.layer = LayerMask.NameToLayer("StaticGear");
+
+			// find the physical (non-trigger) collider
+			/*Collider[] colliders = GetComponents<Collider>();
+			Collider col=null;
+			for (int i=0; i<colliders.Length; ++i)
+				if (!colliders[i].isTrigger)
+					col = colliders[i];
+
+			// ignore collisions with other physical colliders
+			for (int i=0; i<staticColliders.Count; ++i) {
+				Physics.IgnoreCollision(col, staticColliders[i]);
+				print("ignore collision between "+col.gameObject.name+" and "+staticColliders[i].gameObject.name);
+				if (col.isTrigger)
+					print("col is trigger!!!!!!!!!!!!!!!");
+				if (staticColliders[i].isTrigger)
+					print("staticColliders[i].isTrigger!!!!!!!!!!!");
+				//print("colliders are triggers: "+(col.isTrigger?"col IS TRIGGER ":"col isn't trigger ")+
+					//(staticColliders[i].isTrigger?"col IS TRIGGER ":"col isn't trigger "));
+			}
+			staticColliders.Add(col);*/
+		}
 	}
 	
 	void FixedUpdate ()
@@ -32,7 +59,11 @@ public class EnviroGear : MonoBehaviour {
 		transform.Rotate(Time.deltaTime*curAngularVelocity*Vector3.left);
 		
 		// add the angularAcceleration with an appropriate drag force
-		curAngularVelocity += Time.fixedDeltaTime * (angularAcceleration - angularAcceleration*curAngularVelocity/maxAngularVelocity);
+		/*if (angularAcceleration>0)
+			curAngularVelocity += Time.fixedDeltaTime * (angularAcceleration - angularAcceleration*curAngularVelocity/maxAngularVelocity);
+		else
+			curAngularVelocity += Time.fixedDeltaTime * (angularAcceleration + angularAcceleration*curAngularVelocity/maxAngularVelocity);*/
+		curAngularVelocity += Time.fixedDeltaTime * (angularAcceleration - angularAcceleration*Mathf.Abs(curAngularVelocity)/maxAngularVelocity);
 
 		// average out angular speed of neighbors
 		for (int i=0; i<neighbors.Count; ++i)
@@ -41,8 +72,6 @@ public class EnviroGear : MonoBehaviour {
 			// sum angularMomentum, distribute according to moment of inertia
 			float totalAngularMomentum = angularMomentum - neighbors[i].angularMomentum;
 			float totalMomentOfInertia = momentOfIntertia + neighbors[i].momentOfIntertia;
-			print("averaging out: totalAngularMomentum: "+totalAngularMomentum+"; totalMomentOfInertia: "+totalMomentOfInertia);
-			print(totalAngularMomentum*momentOfIntertia/totalMomentOfInertia);
 			angularMomentum = totalAngularMomentum*momentOfIntertia/totalMomentOfInertia;
 			neighbors[i].angularMomentum = -totalAngularMomentum*neighbors[i].momentOfIntertia/totalMomentOfInertia;
 		}
@@ -59,7 +88,7 @@ public class EnviroGear : MonoBehaviour {
 		return result*curAngularVelocity*Mathf.PI/180;
 	}
 
-	void OnCollisionEnter(Collision coll)
+	void OnTriggerEnter(Collider coll)
 	{
 		// find a gear, return if null
 		EnviroGear gear = coll.gameObject.GetComponent<EnviroGear>();
@@ -71,12 +100,12 @@ public class EnviroGear : MonoBehaviour {
 			neighbors.Add(gear);
 	}
 
-	void OnCollisionStay(Collision coll)
+	void OnTriggerStay(Collider coll)
 	{
 		rigidBody.velocity = Vector3.zero;
 	}
 
-	void OnCollisionExit(Collision coll)
+	void OnTriggerExit(Collider coll)
 	{
 		// find a gear, return if null
 		EnviroGear gear = coll.gameObject.GetComponent<EnviroGear>();
